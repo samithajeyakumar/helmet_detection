@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Traffic Violation Detection Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Traffic Rules Violation Detection System</h1>
+        </header>
+        
+        <div class="main-content">
+            <div class="video-container">
+                <h2>Live Detection</h2>
+                <div class="video-wrapper">
+                    <!-- This connects to the video_feed endpoint in your Flask app -->
+                    <img src="data\BB_6d315b1e-956e-43e8-9d62-7d18efed3dd2.mp4" alt="Video Feed">
+                </div>
+            </div>
+            
+            <div class="stats-container">
+                <h2>Violation Statistics</h2>
+                
+                <div class="stat-boxes">
+                    <div class="stat-box" id="helmet-violations">
+                        <h3>Helmet Violations</h3>
+                        <p class="stat-value">0</p>
+                    </div>
+                    
+                    <div class="stat-box" id="total-violations">
+                        <h3>Total Violations</h3>
+                        <p class="stat-value">0</p>
+                    </div>
+                    
+                    <div class="stat-box" id="vehicles-detected">
+                        <h3>Vehicles Detected</h3>
+                        <p class="stat-value">0</p>
+                    </div>
+                </div>
+                
+                <div class="chart-container">
+                    <canvas id="violationChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>Traffic Rules Violation Detection System &copy; 2023</p>
+        </footer>
+    </div>
+    
+    <script>
+        // Initialize chart
+        const ctx = document.getElementById('violationChart').getContext('2d');
+        const violationChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Helmet Violations',
+                    data: [],
+                    borderColor: 'rgb(255, 99, 132)',
+                    tension: 0.1,
+                    fill: false
+                }, {
+                    label: 'Total Objects',
+                    data: [],
+                    borderColor: 'rgb(54, 162, 235)',
+                    tension: 0.1,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        precision: 0
+                    }
+                },
+                animation: {
+                    duration: 500
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false
+                    }
+                }
+            }
+        });
+        
+        // Store historical data
+        const violationHistory = [];
+        let totalViolations = 0;
+        
+        // Update stats and chart
+        function updateStats() {
+            $.ajax({
+                url: '/stats',
+                type: 'GET',
+                dataType: 'json',
+                success: function(data) {
+                    // Update stat boxes
+                    $('#helmet-violations .stat-value').text(data.helmet_violations);
+                    $('#total-violations .stat-value').text(data.total_violations);
+                    $('#vehicles-detected .stat-value').text(data.vehicles_detected);
+                    
+                    // Update chart data
+                    const timestamp = new Date().toLocaleTimeString();
+                    violationHistory.push({
+                        time: timestamp,
+                        helmetViolations: data.helmet_violations,
+                        totalViolations: data.total_violations
+                    });
+                    
+                    // Keep only the last 10 data points
+                    if (violationHistory.length > 10) {
+                        violationHistory.shift();
+                    }
+                    
+                    // Update chart
+                    violationChart.data.labels = violationHistory.map(item => item.time);
+                    violationChart.data.datasets[0].data = violationHistory.map(item => item.helmetViolations);
+                    violationChart.data.datasets[1].data = violationHistory.map(item => item.totalViolations);
+                    violationChart.update();
+                },
+                error: function(error) {
+                    console.error('Error fetching stats:', error);
+                }
+            });
+        }
+        
+        // Update stats every second
+        setInterval(updateStats, 1000);
+        
+        // Initial update
+        updateStats();
+        
+        // Handle connection errors
+        $(document).ajaxError(function(event, jqxhr, settings, thrownError) {
+            if (settings.url === '/stats') {
+                console.log('Connection to server lost. Retrying...');
+            }
+        });
+    </script>
+</body>
+</html>
